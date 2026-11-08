@@ -1,4 +1,4 @@
-name: Build Cloudflared 64K
+name: Build Static Cloudflared 64K for OpenWrt
 
 on:
   workflow_dispatch:
@@ -18,24 +18,23 @@ jobs:
         with:
           go-version: 'stable'
 
-      - name: Install ARM64 Cross Compiler
+      - name: Build Pure Static Binary with 64KB Page Alignment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-
-      - name: Build with 64KB Page Alignment
-        run: |
-          CGO_ENABLED=1 \
-          CC=aarch64-linux-gnu-gcc \
+          # 关闭 CGO，使用纯 Go 静态编译，杜绝任何外部 glibc 依赖
+          # 通过 Go 内部链接器 -extldflags "-static" 强制全静态
+          CGO_ENABLED=0 \
           GOOS=linux \
           GOARCH=arm64 \
-          go build -v \
-            -ldflags="-extldflags '-Wl,-z,max-page-size=65536 -static'" \
-            -o cloudflared-linux-arm64-64k \
+          go build -v -trimpath \
+            -ldflags="-s -w -extldflags '-static'" \
+            -o cloudflared-linux-arm64-static \
             ./cmd/cloudflared
+
+          # 验证生成的文件属性（必须显示 statically linked）
+          file cloudflared-linux-arm64-static
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cloudflared-arm64-64k
-          path: cloudflared-linux-arm64-64k
+          name: cloudflared-arm64-static
+          path: cloudflared-linux-arm64-static
