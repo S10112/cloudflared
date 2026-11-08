@@ -1,0 +1,41 @@
+name: Build Cloudflared 64K
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Official Cloudflare Repo
+        uses: actions/checkout@v4
+        with:
+          repository: cloudflare/cloudflared
+          fetch-depth: 1
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Install ARM64 Cross Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build with 64KB Page Alignment
+        run: |
+          CGO_ENABLED=1 \
+          CC=aarch64-linux-gnu-gcc \
+          GOOS=linux \
+          GOARCH=arm64 \
+          go build -v \
+            -ldflags="-extldflags '-Wl,-z,max-page-size=65536 -static'" \
+            -o cloudflared-linux-arm64-64k \
+            ./cmd/cloudflared
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflared-arm64-64k
+          path: cloudflared-linux-arm64-64k
